@@ -8,26 +8,25 @@
     <style>
         body { font-family: 'Kanit', sans-serif; text-align: center; padding: 20px; background-color: #f4f4f4; }
         .container { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h2 { color: #333; }
+        h2 { color: #333; margin-bottom: 20px; }
         label { display: block; margin: 15px 0 5px; font-weight: bold; text-align: left; }
         select { 
             width: 100%; padding: 12px; font-size: 16px; 
             border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px;
         }
-        #btnLocation { 
+        #btnPicker { 
             width: 100%; padding: 15px; font-size: 18px; 
             background-color: #00b900; color: white; 
             border: none; border-radius: 8px; cursor: pointer; font-weight: bold;
         }
-        #btnLocation:disabled { background-color: #ccc; }
         #status { margin-top: 20px; color: #666; font-size: 14px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>🚚 สั่งดิน/วัสดุถม</h2>
+        <h2>🚚 สั่งดิน/วัสดุถม (ระบุพิกัด)</h2>
         
-        <label for="soilType">เลือกชนิดวัสดุ:</label>
+        <label>ชนิดวัสดุ:</label>
         <select id="soilType">
             <option value="ดินถมทั่วไป">ดินถมทั่วไป</option>
             <option value="ดินลูกรัง">ดินลูกรัง</option>
@@ -35,15 +34,16 @@
             <option value="หินคลุก">หินคลุก</option>
         </select>
 
-        <label for="carType">ประเภทรถขนส่ง:</label>
+        <label>ประเภทรถ:</label>
         <select id="carType">
             <option value="6 ล้อ">รถ 6 ล้อ</option>
             <option value="10 ล้อ">รถ 10 ล้อ</option>
             <option value="พ่วง">รถพ่วง</option>
         </select>
 
-        <button id="btnLocation" disabled>📍 จิ้มพิกัดหน้างานเพื่อสั่งซื้อ</button>
-        <p id="status">กำลังโหลดระบบ...</p>
+        <button id="btnPicker" onclick="openLocationPicker()">📍 เลือกพิกัดหน้างานบนแผนที่</button>
+        
+        <p id="status">เลือกวัสดุแล้วกดปุ่มเพื่อปักหมุดพิกัด</p>
     </div>
 
     <script>
@@ -54,45 +54,38 @@
                 await liff.init({ liffId: liffId });
                 if (!liff.isLoggedIn()) {
                     liff.login();
-                } else {
-                    document.getElementById("status").innerText = "พร้อมระบุพิกัดแล้ว";
-                    document.getElementById("btnLocation").disabled = false;
-                    document.getElementById("btnLocation").onclick = getLocation;
                 }
             } catch (err) {
-                document.getElementById("status").innerText = "ระบบขัดข้อง: " + err;
+                console.error(err);
             }
         }
 
-        function getLocation() {
-            const statusLabel = document.getElementById("status");
-            const soilType = document.getElementById("soilType").value;
-            const carType = document.getElementById("carType").value;
+        function openLocationPicker() {
+            // ดึงค่าที่ลูกค้าเลือกไว้
+            const soil = document.getElementById("soilType").value;
+            const car = document.getElementById("carType").value;
 
-            statusLabel.innerText = "กำลังเข้าถึง GPS...";
-
-            navigator.geolocation.getCurrentPosition(async (position) => {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                statusLabel.innerText = "ส่งข้อมูลคำสั่งซื้อ...";
-
-                try {
-                    // ส่งข้อความกลับไปที่แชท พ่วงข้อมูล ชนิดดิน และ ประเภทรถ
-                    await liff.sendMessages([{
-                        type: 'location',
-                        title: `สั่งซื้อ: ${soilType}`,
-                        address: `รถ: ${carType} | พิกัดหน้างานของลูกค้า`, // ส่งข้อมูลรถพ่วงไปใน address เพื่อให้ Webhook ดึงไปคำนวณ
-                        latitude: lat,
-                        longitude: lng
-                    }]);
-                    
-                    liff.closeWindow(); 
-                } catch (error) {
-                    statusLabel.innerText = "Error: " + error.message;
+            // ใช้คำสั่งเปิดตัวเลือกพิกัดมาตรฐานของ LINE
+            // ลูกค้าจะสามารถค้นหาที่อยู่หรือเลื่อนหมุดเองได้
+            liff.sendMessages([{
+                type: "template",
+                altText: "กรุณาเลือกตำแหน่งส่งดิน",
+                template: {
+                    type: "buttons",
+                    text: `กำลังสั่ง: ${soil} (${car})\nกรุณากดปุ่มด้านล่างเพื่อเลือกพิกัด`,
+                    actions: [{
+                        type: "uri",
+                        label: "🚩 ปักหมุดพิกัดหน้างาน",
+                        uri: "https://line.me/R/nv/location/" 
+                    }]
                 }
-            }, (error) => {
-                statusLabel.innerText = "กรุณาเปิด GPS และอนุญาตการเข้าถึงพิกัด";
-            }, { enableHighAccuracy: true });
+            }]).then(() => {
+                // หลังจากส่งปุ่มเลือกพิกัดเสร็จ ให้ปิดหน้า LIFF
+                // ลูกค้าจะไปกดเลือกพิกัดต่อในห้องแชท
+                liff.closeWindow();
+            }).catch((err) => {
+                alert("Error: " + err.message);
+            });
         }
 
         main();
