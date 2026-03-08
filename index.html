@@ -1,40 +1,86 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ลงงานวิ่งดิน</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; }
+        #btnLocation { 
+            padding: 15px 30px; font-size: 18px; 
+            background-color: #00b900; color: white; 
+            border: none; border-radius: 8px; cursor: pointer;
+        }
+        #status { margin-top: 20px; color: #666; }
+    </style>
 </head>
 <body>
     <h2>บันทึกพิกัดหน้างาน</h2>
-    <button id="btnLocation" onclick="getLocation()">📍 กดเพื่อส่งพิกัดปัจจุบัน</button>
-    <p id="status"></p>
+    <button id="btnLocation">📍 กดเพื่อส่งพิกัดปัจจุบัน</button>
+    <p id="status">กำลังเตรียมความพร้อม...</p>
 
     <script>
+        const liffId = "ใส่_LIFF_ID_ของคุณที่นี่"; // *** เปลี่ยนเป็น LIFF ID ของคุณ ***
+
         async function main() {
-            await liff.init({ liffId: "ใส่_LIFF_ID_ของคุณที่นี่" });
+            try {
+                await liff.init({ liffId: liffId });
+                if (!liff.isLoggedIn()) {
+                    liff.login(); // บังคับ Login ถ้ายังไม่ได้ล็อคอิน
+                } else {
+                    document.getElementById("status").innerText = "พร้อมใช้งานแล้ว";
+                    document.getElementById("btnLocation").onclick = getLocation;
+                }
+            } catch (err) {
+                document.getElementById("status").innerText = "LIFF Init ผิดพลาด: " + err;
+            }
         }
-        main();
 
         function getLocation() {
-            document.getElementById("status").innerText = "กำลังหาพิกัด...";
-            
-            // ใช้ Browser Geolocation API
+            const statusLabel = document.getElementById("status");
+            statusLabel.innerText = "กำลังขอพิกัด GPS...";
+
+            if (!navigator.geolocation) {
+                statusLabel.innerText = "เบราว์เซอร์ของคุณไม่รองรับการระบุตำแหน่ง";
+                return;
+            }
+
+            // ตั้งค่าดึงพิกัดแบบแม่นยำสูง (High Accuracy)
+            const geoOptions = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            };
+
             navigator.geolocation.getCurrentPosition(async (position) => {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
+                statusLabel.innerText = `เจอพิกัดแล้ว (${lat.toFixed(4)}, ${lng.toFixed(4)}) กำลังส่งข้อมูล...`;
 
-                // ส่งข้อความกลับไปในแชทบอท (เพื่อให้ Webhook ทำงานต่อ)
-                await liff.sendMessages([{
-                    type: 'location',
-                    title: 'พิกัดหน้างาน',
-                    address: 'ตำแหน่งที่เครื่องตรวจพบ',
-                    latitude: lat,
-                    longitude: lng
-                }]);
-                
-                liff.closeWindow(); // ปิดหน้าต่าง LIFF ทันที
-            });
+                try {
+                    // ส่งข้อความประเภท Location เข้าแชท
+                    await liff.sendMessages([{
+                        type: 'location',
+                        title: '📍 พิกัดหน้างาน (จากระบบ)',
+                        address: 'บันทึกอัตโนมัติโดยระบบ',
+                        latitude: lat,
+                        longitude: lng
+                    }]);
+                    
+                    alert("บันทึกพิกัดเรียบร้อย!");
+                    liff.closeWindow(); 
+                } catch (error) {
+                    statusLabel.innerText = "ส่งข้อความไม่สำเร็จ: " + error.message;
+                    console.error(error);
+                }
+            }, (error) => {
+                // จัดการกรณีคนขับปิด GPS หรือไม่ยอมกดปุ่ม Allow
+                statusLabel.innerText = "หาพิกัดไม่สำเร็จ: " + error.message;
+            }, geoOptions);
         }
+
+        main();
     </script>
 </body>
 </html>
