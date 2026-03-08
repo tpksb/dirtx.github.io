@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ลงงานวิ่งดิน</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+    <h2>บันทึกพิกัดหน้างาน</h2>
+    <button id="btnLocation" onclick="getLocation()">📍 กดเพื่อส่งพิกัดปัจจุบัน</button>
+    <p id="status"></p>
+
+    <script>
+        async function main() {
+            await liff.init({ liffId: "ใส่_LIFF_ID_ของคุณที่นี่" });
+        }
+        main();
+
+        function getLocation() {
+            document.getElementById("status").innerText = "กำลังหาพิกัด...";
+            
+            // ใช้ Browser Geolocation API
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+
+                // ส่งข้อความกลับไปในแชทบอท (เพื่อให้ Webhook ทำงานต่อ)
+                await liff.sendMessages([{
+                    type: 'location',
+                    title: 'พิกัดหน้างาน',
+                    address: 'ตำแหน่งที่เครื่องตรวจพบ',
+                    latitude: lat,
+                    longitude: lng
+                }]);
+                
+                liff.closeWindow(); // ปิดหน้าต่าง LIFF ทันที
+            });
+        }
+    </script>
+</body>
+</html>
