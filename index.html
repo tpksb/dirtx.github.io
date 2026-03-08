@@ -3,81 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ลงงานวิ่งดิน</title>
+    <title>สั่งดินออนไลน์</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; }
-        #btnLocation { 
-            padding: 15px 30px; font-size: 18px; 
-            background-color: #00b900; color: white; 
-            border: none; border-radius: 8px; cursor: pointer;
+        body { font-family: 'Kanit', sans-serif; text-align: center; padding: 20px; background-color: #f4f4f4; }
+        .container { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { color: #333; }
+        label { display: block; margin: 15px 0 5px; font-weight: bold; text-align: left; }
+        select { 
+            width: 100%; padding: 12px; font-size: 16px; 
+            border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px;
         }
-        #status { margin-top: 20px; color: #666; }
+        #btnLocation { 
+            width: 100%; padding: 15px; font-size: 18px; 
+            background-color: #00b900; color: white; 
+            border: none; border-radius: 8px; cursor: pointer; font-weight: bold;
+        }
+        #btnLocation:disabled { background-color: #ccc; }
+        #status { margin-top: 20px; color: #666; font-size: 14px; }
     </style>
 </head>
 <body>
-    <h2>บันทึกพิกัดหน้างาน</h2>
-    <button id="btnLocation">📍 กดเพื่อส่งพิกัดปัจจุบัน</button>
-    <p id="status">กำลังเตรียมความพร้อม...</p>
+    <div class="container">
+        <h2>🚚 สั่งดิน/วัสดุถม</h2>
+        
+        <label for="soilType">เลือกชนิดวัสดุ:</label>
+        <select id="soilType">
+            <option value="ดินถมทั่วไป">ดินถมทั่วไป</option>
+            <option value="ดินลูกรัง">ดินลูกรัง</option>
+            <option value="ทรายละเอียด">ทรายละเอียด</option>
+            <option value="หินคลุก">หินคลุก</option>
+        </select>
+
+        <label for="carType">ประเภทรถขนส่ง:</label>
+        <select id="carType">
+            <option value="6 ล้อ">รถ 6 ล้อ</option>
+            <option value="10 ล้อ">รถ 10 ล้อ</option>
+            <option value="พ่วง">รถพ่วง</option>
+        </select>
+
+        <button id="btnLocation" disabled>📍 จิ้มพิกัดหน้างานเพื่อสั่งซื้อ</button>
+        <p id="status">กำลังโหลดระบบ...</p>
+    </div>
 
     <script>
-        const liffId = "2009364460-4bj0WDAv"; // *** เปลี่ยนเป็น LIFF ID ของคุณ ***
+        const liffId = "2009364460-4bj0WDAv"; 
 
         async function main() {
             try {
                 await liff.init({ liffId: liffId });
                 if (!liff.isLoggedIn()) {
-                    liff.login(); // บังคับ Login ถ้ายังไม่ได้ล็อคอิน
+                    liff.login();
                 } else {
-                    document.getElementById("status").innerText = "พร้อมใช้งานแล้ว";
+                    document.getElementById("status").innerText = "พร้อมระบุพิกัดแล้ว";
+                    document.getElementById("btnLocation").disabled = false;
                     document.getElementById("btnLocation").onclick = getLocation;
                 }
             } catch (err) {
-                document.getElementById("status").innerText = "LIFF Init ผิดพลาด: " + err;
+                document.getElementById("status").innerText = "ระบบขัดข้อง: " + err;
             }
         }
 
         function getLocation() {
             const statusLabel = document.getElementById("status");
-            statusLabel.innerText = "กำลังขอพิกัด GPS...";
+            const soilType = document.getElementById("soilType").value;
+            const carType = document.getElementById("carType").value;
 
-            if (!navigator.geolocation) {
-                statusLabel.innerText = "เบราว์เซอร์ของคุณไม่รองรับการระบุตำแหน่ง";
-                return;
-            }
-
-            // ตั้งค่าดึงพิกัดแบบแม่นยำสูง (High Accuracy)
-            const geoOptions = {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            };
+            statusLabel.innerText = "กำลังเข้าถึง GPS...";
 
             navigator.geolocation.getCurrentPosition(async (position) => {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
-                statusLabel.innerText = `เจอพิกัดแล้ว (${lat.toFixed(4)}, ${lng.toFixed(4)}) กำลังส่งข้อมูล...`;
+                statusLabel.innerText = "ส่งข้อมูลคำสั่งซื้อ...";
 
                 try {
-                    // ส่งข้อความประเภท Location เข้าแชท
+                    // ส่งข้อความกลับไปที่แชท พ่วงข้อมูล ชนิดดิน และ ประเภทรถ
                     await liff.sendMessages([{
                         type: 'location',
-                        title: '📍 พิกัดหน้างาน (จากระบบ)',
-                        address: 'บันทึกอัตโนมัติโดยระบบ',
+                        title: `สั่งซื้อ: ${soilType}`,
+                        address: `รถ: ${carType} | พิกัดหน้างานของลูกค้า`, // ส่งข้อมูลรถพ่วงไปใน address เพื่อให้ Webhook ดึงไปคำนวณ
                         latitude: lat,
                         longitude: lng
                     }]);
                     
-                    alert("บันทึกพิกัดเรียบร้อย!");
                     liff.closeWindow(); 
                 } catch (error) {
-                    statusLabel.innerText = "ส่งข้อความไม่สำเร็จ: " + error.message;
-                    console.error(error);
+                    statusLabel.innerText = "Error: " + error.message;
                 }
             }, (error) => {
-                // จัดการกรณีคนขับปิด GPS หรือไม่ยอมกดปุ่ม Allow
-                statusLabel.innerText = "หาพิกัดไม่สำเร็จ: " + error.message;
-            }, geoOptions);
+                statusLabel.innerText = "กรุณาเปิด GPS และอนุญาตการเข้าถึงพิกัด";
+            }, { enableHighAccuracy: true });
         }
 
         main();
